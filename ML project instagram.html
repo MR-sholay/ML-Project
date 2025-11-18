@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fake Profile Detector</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --accent: #00e5ff;
+      --accent-hover: #09d0e8;
+      --danger: #ff4d4d;
+      --ok: #3ee68b;
+      --muted: #8b98a5;
+      --glass: rgba(255,255,255,0.04);
+      font-family: "Inter", Arial, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: #e9eef5;
+      margin: 0;
+      padding: 32px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 940px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 35px rgba(0,0,0,0.45);
+      margin-bottom: 20px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .col {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--glass);
+      font-size: 15px;
+      color: #e6eef6;
+      outline: none;
+      transition: 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0,229,255,0.15);
+    }
+
+    button {
+      padding: 12px 18px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      background: var(--accent);
+      color: #002a32;
+      font-weight: 700;
+      font-size: 15px;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .small {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    #resultBox {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .status {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .status.fake { color: var(--danger); }
+    .status.real { color: var(--ok); }
+
+    .meta {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.6;
+    }
+
+    .loader {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <div class="card">
+      <h1>Instagram Fake Profile Detector</h1>
+
+      <!-- URL CHECK -->
+      <div class="row">
+        <div class="col">
+          <label class="small">Check by Instagram URL</label>
+          <input id="instaUrl" placeholder="https://instagram.com/username" />
+        </div>
+        <div style="align-self:flex-end">
+          <button id="checkUrlBtn">Check URL</button>
+        </div>
+      </div>
+
+      <div style="height: 14px;"></div>
+
+      <!-- MANUAL -->
+      <div class="small">If Not Enter profile features manually</div>
+      <div style="height: 10px;"></div>
+
+      <div class="row">
+        <div class="col"><input id="followers" placeholder="Followers" /></div>
+        <div class="col"><input id="following" placeholder="Following" /></div>
+        <div class="col"><input id="posts" placeholder="Posts" /></div>
+        <div class="col"><input id="account_age" placeholder="Account age (days)" /></div>
+      </div>
+
+      <div style="height: 10px;"></div>
+
+      <div class="row">
+        <div class="col"><input id="bio_length" placeholder="Bio length" /></div>
+        <div class="col"><input id="story_count" placeholder="Story count" /></div>
+        <div class="col"><input id="has_profile_picture" placeholder="Has profile picture (0 or 1)" /></div>
+        <div style="align-self:flex-end">
+          <button id="checkFeaturesBtn">Check Features</button>
+        </div>
+      </div>
+
+      <div id="resultBox" style="display:none">
+        <div id="statusLine" class="status">—</div>
+        <div id="probLine" class="meta"></div>
+        <div id="dataLine" class="meta"></div>
+      </div>
+    </div>
+
+    <!-- Instructions Card -->
+    <div class="card small">
+      <strong>Instructions</strong>
+      <ul>
+        <li>Use a correct Instagram URL. May or May not work on private profiles Accurately.</li>
+        <li>This tool is still in testing Phase.</li>
+      </ul>
+    </div>
+  </div>
+
+<script>
+  const API_BASE = "https://kyndall-punctate-liane.ngrok-free.dev";
+  const URL_ENDPOINT = API_BASE + "/predict_url";
+  const FEATURES_ENDPOINT = API_BASE + "/predict_features";
+
+  const el = id => document.getElementById(id);
+
+  // Format data cleanly
+  const formatInfo = (data) => {
+    if (!data) return "";
+
+    return `
+      <b>Followers:</b> ${data.followers}<br>
+      <b>Following:</b> ${data.following}<br>
+      <b>Posts:</b> ${data.posts}<br>
+      <b>Account Age:</b> ${data.account_age} days<br>
+      <b>Bio Length:</b> ${data.bio_length} chars<br>
+      <b>Story Count:</b> ${data.story_count}<br>
+      <b>Has Profile Picture:</b> ${data.has_profile_picture ? "Yes" : "No"}<br>
+      <b>Avg Likes:</b> ${data.avg_likes}<br>
+      <b>Avg Comments:</b> ${data.avg_comments}<br>
+      <b>Private Account:</b> ${data.is_private ? "Yes" : "No"}<br>
+      <b>Suspicious Hashtags:</b> ${data.suspicious_hashtags}
+    `;
+  };
+
+  const showResult = (status, prob, info) => {
+    el("resultBox").style.display = "block";
+    const s = el("statusLine");
+
+    s.className = "status " + (status === "FAKE" ? "fake" : "real");
+    s.textContent = status === "FAKE" ? "Likely Fake Account" : "Likely Real Account";
+
+    el("probLine").textContent = "Fake Probability: " + 
+      (prob !== null ? (prob * 100).toFixed(1) + "%" : "N/A");
+
+    el("dataLine").innerHTML = formatInfo(info);
+  };
+
+  const showLoading = (btn) => {
+    btn.disabled = true;
+    btn.dataset.old = btn.textContent;
+    btn.innerHTML = '<span class="loader"></span>';
+  };
+
+  const hideLoading = (btn) => {
+    btn.disabled = false;
+    btn.textContent = btn.dataset.old;
+  };
+
+  // URL CHECK
+  document.getElementById("checkUrlBtn").addEventListener("click", async () => {
+    const url = el("instaUrl").value.trim();
+    if (!url) return alert("Enter Instagram URL");
+
+    const btn = el("checkUrlBtn");
+    showLoading(btn);
+
+    try {
+      const res = await fetch(URL_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      const data = await res.json();
+      showResult(data.prediction, data.probability_fake, data.instagram_stats || data);
+
+    } catch (err) {
+      alert("Request failed: " + err.message);
+    } finally {
+      hideLoading(btn);
+    }
+  });
+
+  // FEATURE CHECK
+  document.getElementById("checkFeaturesBtn").addEventListener("click", async () => {
+    const body = {
+      followers: Number(el("followers").value || 0),
+      following: Number(el("following").value || 0),
+      posts: Number(el("posts").value || 0),
+      account_age: Number(el("account_age").value || 0),
+      bio_length: Number(el("bio_length").value || 0),
+      story_count: Number(el("story_count").value || 0),
+      has_profile_picture: Number(el("has_profile_picture").value || 1),
+      avg_likes: 0,
+      avg_comments: 0,
+      is_private: 0,
+      suspicious_hashtags: 0
+    };
+
+    const btn = el("checkFeaturesBtn");
+    showLoading(btn);
+
+    try {
+      const res = await fetch(FEATURES_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      const data = await res.json();
+      showResult(data.prediction, data.probability_fake, data.features_used || data);
+
+    } catch (err) {
+      alert("Request failed: " + err.message);
+    } finally {
+      hideLoading(btn);
+    }
+  });
+</script>
+
+</body>
+</html>
